@@ -1,0 +1,103 @@
+---
+title: "Основы программирования в R"
+author: "Алла Тамбовцева"
+output: html_document
+---
+
+Семинар 3. Таблицы и `dplyr`. Решения.
+================
+
+## Часть 1
+
+На этом семинаре мы будем работать с [файлом](https://hubofdata.ru/dataset/mos-buildings-years), содержащим информацию о годах постройки жилых домов в Москве. Данные достаточно новые, а для вдохновения [посмотрите](http://msk.mercator.ru/), что можно получить, используя эту информацию.
+
+Мы, правда, займемся пока вещами попроще.
+
+1.  Загрузите файл `moscow-buildings.csv` и сохраните ее как `df_build`. Посмотрите на датафрейм.
+
+```{r, message=FALSE, warning=FALSE}
+library(dplyr)
+df_build <- read.csv("https://raw.githubusercontent.com/allatambov/R-programming-3/master/seminars/sem4-08-12/moscow-buildings.csv", encoding="UTF-8")
+# View(df_build)
+```
+
+2.  Используя функции `dplyr`, удалите из базы данных строки, в которых значения года постройки не указаны ("н.д."), а после превратите столбец `year` в числовой. R будет воспринимать столбец как факторный, поэтому нужно сначала превратить его в текстовый, а затем - в числовой или использовать специальную функцию `levels()`.
+
+```{r}
+df_build <- df_build %>% filter(house_year != "н.д.") %>% 
+  mutate(house_year = as.numeric(levels(house_year)[house_year]))
+```
+
+3.  Посмотрите на минимальное и максимальное значения года постройки. Разумны ли они? Если нет, уберите из базы данных «странные» значения годы постройки.
+
+```{r}
+df_build %>% summarise(min = min(house_year), max = max(house_year))
+
+df_build <- df_build %>% filter(house_year > 1600 & house_year < 2018)
+```
+
+4.  Выберите из базы данных строки, соответствующие Басманному району и сохраните их в базу `basm_data`.
+
+```{r}
+basm_data <- df_build %>% filter(area_name == "муниципальный округ Басманный")
+```
+
+5.  Сгруппируйте данные в базе по районам и посмотрите, сколько домов в базе относятся к каждому району.
+
+```{r, eval=FALSE}
+df_build %>% group_by(area_name) %>% tally %>% View
+```
+
+6.  Найдите средний возраст дома (возраст - в годах, считаем от 2018) по каждому району. 
+
+    *Подсказка:* сначала добавьте переменную `house_age` («возраст дома»).
+    
+    ```{r}
+df_build <- df_build %>% mutate(house_age = 2018 - house_year)
+    
+df_build %>% group_by(area_name) %>% 
+  summarise(avg_age = mean(house_age))
+    ```
+
+7.  Найдите улицу с самым старым домом.
+
+```{r}
+df_build %>% arrange(house_year) %>% head(1) %>% select(street_name)
+```
+
+
+## Часть 2
+
+Сейчас вам предлагается поработать с файлом `CPDS.csv`, который содержит показатели из *Comparative Political Data Set*. Познакомиться с проектом и codebook для таблицы можно [здесь](http://www.cpds-data.org/index.php/data).
+
+1. Загрузить файл `CPDS.csv`, учитывая, что десятичный разделитель - запятая. Сделать так, чтобы текстовые столбцы считывались как текст, а не как факторы. *Подсказка:* аргумент `stringsAsFactors = FALSE` в функции `read.csv()`.
+
+```{r}
+cp <- read.csv("http://math-info.hse.ru/f/2018-19/pep/hw/CPDS.csv", dec = ",", stringsAsFactors = FALSE)
+```
+
+
+2. Создать столбец `log_pop` с логарифмированными значения численности населения.
+
+```{r}
+cp <- cp %>% mutate(log_pop = log(pop))
+```
+
+3. Выбрать столбцы `country`, `year`, `poco`, `eu`, `gov_right1`, `gov_cent1`, `gov_left1`, `log_pop` и сохранить их как `small`.
+
+```{r}
+small <- cp %>% select(country, year, poco, eu, gov_right1, gov_cent1, gov_left1, log_pop)
+```
+
+4. Сколько наблюдений в датафрейме соответствуют пост-коммунистическим и не пост-коммунистическим странам?
+
+```{r}
+cp %>% group_by(poco) %>% tally
+```
+
+5. Сколько пост-коммунистических и не пост-коммунистических стран в датафрейме? *Подсказка:* используйте функцию `n_distinct` для подсчёта уникальных значений в столбце.
+
+```{r}
+cp %>% group_by(poco) %>% summarise(n = n_distinct(country))
+```
+

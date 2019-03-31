@@ -1,0 +1,143 @@
+---
+title: "Основы программирования в R"
+subtitle: "Описательные статистики с помощью `dplyr` и `stargazer`"
+author: "Алла Тамбовцева"
+output: html_document
+---
+
+Мы продолжаем работать с файлом про шоколадные торты:
+
+```{r}
+cakes <- read.csv("https://raw.githubusercontent.com/vincentarelbundock/Rdatasets/master/csv/lme4/cake.csv")
+```
+
+Посмотрим, как можно выводить описательные статистики с помощью `dplyr`. Запросим внутри `summarise()` число наблюдений через `n()`, среднее и стандартное отклонение:
+
+```{r, message=FALSE, warning=FALSE}
+library(dplyr)
+
+cakes %>% summarise(observations = n(),
+                    avg = mean(temp),
+                    sd = sd(temp))
+```
+
+Мы вывели на экран нужные характеристики. Теперь попробуем на их основе создать новые. Добавим столбец `cv` с коэффициентом вариации:
+
+```{r}
+cakes %>% summarise(observations = n(),
+                    avg = mean(temp),
+                    sd = sd(temp)) %>% 
+  mutate(cv = sd / avg)
+```
+
+В `mutate()` можно указывать любые названия столбцов, с пробелами, на кириллице и прочим. Убедимся в этом: назовём столбец с коэффициентов вариации иначе и переведём его в проценты:
+
+```{r}
+cakes %>% summarise(observations = n(),
+                    avg = mean(temp),
+                    sd = sd(temp)) %>% 
+             mutate("CV (in %)" = sd / avg * 100)
+```
+
+Если нужно вывести описательные статистики по группам, можно сочетать `groupby()` и `summarise()`:
+
+```{r}
+cakes %>% group_by(recipe) %>%
+  summarise(observations = n(),
+            avg = mean(temp),
+            sd = sd(temp)) %>% 
+  mutate("CV (in %)" = sd / avg * 100)
+```
+
+Теперь познакомимся с библиотекой `stargazer`. R позволяет выгружать не только таблицы с результатами регрессии, но и почти любые таблицы, например, таблицу с описательными статистиками. 
+
+Для начала загрузим библиотеку `stargazer`. Она используется для выгрузки таблиц «во внешний мир». Библиотека называется так неслучайно: обычно она используется для выгрузки результатов регрессионных моделей, а в моделях значимость коэффициентов для наглядности обозначается звёздочками. Вот и получается *star* + *gaze* *(глазеть, пристально смотреть)*, в итоге *stargazer*.
+
+```{r, eval=FALSE}
+install.packages("stargazer")
+```
+
+```{r, message=FALSE, warning=FALSE}
+library(stargazer)
+```
+
+Для того, чтобы вывести таблицу с описательными статистиками, нужно просто набрать `stargazer()` и указать датафрейм:
+
+```{r}
+stargazer(cakes) 
+```
+
+Для тех, кто умеет работать в LaTeX, все просто — R выдал теховский код, который можно просто скопировать в tex-файл. Обратите внимание: в начале кода в качестве комментария всегда указывается, есть ли необходимость догружать (указывать в преамбуле) специальные пакеты или нет. В данном случае не нужно.
+
+Можно выгрузить таблицу в tex-файл. Но это будет файл только с кодом для таблицы, без преамбулы и прочего:
+
+```{r}
+stargazer(cakes, out = "mytable.tex")
+```
+
+Посмотрим, в какую папку этот файл сохранился:
+
+```{r}
+getwd()
+```
+
+Тем, кто в LaTeX не работает, легче не стало. Но выход есть. Stargazer умеет не только выводить код в консоль, но и сохранять результат в отдельный файл. Этот файл может быть теховским файлом (`.tex`), текстовым (`.txt`) и html-файлом (`.html`или `.htm`). Word умеет открывать файлы с расширением `.htm`.  И Libre Office/Open Office тоже.
+
+```{r, results='asis'}
+stargazer(cakes, type = "html", 
+          out = "mytable.htm")
+```
+
+Теперь попробуем вывести описательные статистики не для всех переменных, а для нескольких:
+
+```{r, results='asis'}
+stargazer(subset(cakes, select = c("angle", "temp")), 
+          type = "html",
+          out = "mytable.htm")
+```
+
+Добавим заголовок для таблицы и комментарии (`notes`), а также выровним комментарии по правому краю (`'r'`):
+
+```{r, results='asis'}
+stargazer(subset(cakes, select = c("angle", "temp")), 
+          type = "html",
+          out = "mytable.htm",
+          title = "Summary statistics",
+          notes = "N = 270",
+          notes.align = 'r')
+```
+
+Сообщим R, что мы хотим не более 2 знаков после запятой:
+
+```{r, results='asis'}
+stargazer(subset(cakes, select = c("angle", "temp")), 
+          type = "html",
+          out = "mytable.htm",
+          title = "Summary statistics",
+          notes = "N = 270",
+          notes.align = 'r',
+          digits = 2)
+```
+
+Наконец, отрегулируем, какие статистики убрать, а какие - оставить. Уберём из выдачи число наблюдений (оно у нас есть в комментариях), минимум, максимум, нижний и верхний квантили, но зато добавим медиану:
+
+```{r, results='asis'}
+# omit.summary.stat
+# median
+stargazer(subset(cakes, select = c("angle", "temp")), 
+          type = "html",
+          out = "mytable.htm",
+          title = "Summary statistics",
+          notes = "N = 270",
+          notes.align = 'r',
+          digits = 2,
+          omit.summary.stat = c("n", "min", "max", "p25", "p75"),
+          median = TRUE)
+```
+
+На этом возможности `stargazer` не ограничиваются. Очень рекомендую запросить `help` и немного порефлексировать над имеющимися опциями.
+
+```{r, eval=FALSE}
+?stargazer
+```
+
